@@ -266,3 +266,11 @@ def load_team_snapshot(season):
         pass
 
     return snap
+
+def editing_enabled():
+    """Editing the favorites list is on locally. Setting PUBLIC_MODE = true in the
+    deployed app's Secrets turns it off for visitors."""
+    try:
+        return not bool(st.secrets.get("PUBLIC_MODE", False))
+    except Exception:
+        return True
