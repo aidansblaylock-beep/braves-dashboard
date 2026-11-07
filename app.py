@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import date
 from data import load_team_snapshot, SHOW_MLB_IMAGES
 
-st.set_page_config(page_title="Braves Stats Hub", layout="wide")
+st.set_page_config(page_title="Braves-Dashboard", layout="wide")
 
 # Logo images (swap these two URLs if you'd rather use your own files)
 BRAVES_LOGO = "https://www.mlbstatic.com/team-logos/team-cap-on-dark/144.svg"
