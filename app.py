@@ -130,6 +130,7 @@ pages = [
     st.Page("views/roster.py", title="Braves Roster", icon=":material/groups:", url_path="roster"),
     st.Page("views/watch.py", title="Players to Watch", icon=":material/star:", url_path="watch"),
     st.Page("views/field_view.py", title="Field View", icon=":material/sports_baseball:", url_path="field-view"),
+        st.Page("views/offseason.py", title="Offseason", icon=":material/swap_horiz:", url_path="offseason"),
 ]
 
 pg = st.navigation(pages, position="top")
