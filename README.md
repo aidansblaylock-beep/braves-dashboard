@@ -4,10 +4,10 @@ An interactive baseball stats dashboard built with Python and Streamlit. It trac
 
 **Live app:** https://braves-dashboard.streamlit.app/
 
-![Home page](screenshots/home.png)
-![Home page, standings and team leaders](screenshots/home_2.png)
-![Field View menu](screenshots/field_view_menu.png)
-![Field View with hover details](screenshots/spray_chart_with_hover_details.png)
+<p>
+  <img src="screenshots/home.png" width="49%">
+  <img src="screenshots/spray_chart_with_hover_details.png" width="49%">
+</p>
 
 ## Features
 
@@ -21,6 +21,16 @@ An interactive baseball stats dashboard built with Python and Streamlit. It trac
   - Home run arcs colored by distance, with a home run log
   - Heatmap view for career data
 - **Header stat strip:** live Braves record, division rank, last game and next game.
+
+<details>
+<summary>More screenshots</summary>
+
+![Home page, standings and team leaders](screenshots/home_2.png)
+![Field View player card](screenshots/spray_chart_player_card.png)
+![Braves roster](screenshots/braves_roster.png)
+![Field View menu](screenshots/field_view_menu.png)
+
+</details>
 
 ## Tech stack
 
