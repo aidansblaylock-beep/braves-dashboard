@@ -26,9 +26,11 @@ An interactive baseball stats dashboard built with Python and Streamlit. It trac
 <summary>More screenshots</summary>
 
 ![Home page, standings and team leaders](screenshots/home_2.png)
+![Field View menu](screenshots/field_view_menu.png)
 ![Field View player card](screenshots/spray_chart_player_card.png)
 ![Braves roster](screenshots/braves_roster.png)
-![Field View menu](screenshots/field_view_menu.png)
+![Players to Watch](screenshots/players.png)
+
 
 </details>
 
