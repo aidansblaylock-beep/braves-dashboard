@@ -5,9 +5,9 @@ An interactive baseball stats dashboard built with Python and Streamlit. It trac
 **Live app:** https://braves-dashboard.streamlit.app/
 
 ![Home page](screenshots/home.png)
+![Home page, standings and team leaders](screenshots/home_2.png)
 ![Field View menu](screenshots/field_view_menu.png)
 ![Field View with hover details](screenshots/spray_chart_with_hover_details.png)
-![Players to Watch](screenshots/players.png)
 
 ## Features
 
