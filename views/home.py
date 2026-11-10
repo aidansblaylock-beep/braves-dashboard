@@ -2,8 +2,8 @@ import html
 import requests
 import pandas as pd
 import streamlit as st
-from datetime import date, datetime
-from data import load_roster
+from datetime import date, datetime, timedelta
+from data import load_roster, load_transactions, NEWS_LINKS
 
 BASE_URL = "https://statsapi.mlb.com/api/v1"
 BRAVES_ID = 144
@@ -83,6 +83,22 @@ STYLE = """
 .lc-row { display: flex; justify-content: space-between; font-size: 0.85rem; color: #44556d; padding: 2px 0; }
 .lc-row b { color: #0b1f3a; }
 .lc-empty { color: #8a96a6; font-size: 0.9rem; }
+
+/* Latest moves and reading list */
+.move-row {
+    display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid #eef1f5;
+    font-size: 0.88rem; color: #0b1f3a; line-height: 1.35;
+}
+.move-row .date { color: #5b6b82; width: 54px; font-size: 0.8rem; flex-shrink: 0; }
+.link-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.link-card {
+    display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; background: #ffffff;
+    border: 1px solid #e3e8ef; border-left: 4px solid #0b1f3a; border-radius: 8px;
+    text-decoration: none; transition: border-color 0.15s, transform 0.15s;
+}
+.link-card:hover { border-left-color: #d6001c; transform: translateY(-1px); }
+.link-card .ln { font-weight: 800; color: #0b1f3a; font-size: 0.95rem; }
+.link-card .lnote { color: #5b6b82; font-size: 0.8rem; }
 </style>
 """
 
@@ -250,6 +266,39 @@ def leader_card_html(label, leaders):
         '<span class="lc-value">' + top_value + "</span></div>" + rest + "</div>"
     )
 
+# Types of moves to hide from the Home card (minor league shuffling). Edit to taste.
+NOISE_WORDS = ("Assigned", "Optioned", "Recalled", "Status Change", "Rehab")
+
+
+def latest_moves(n=6):
+    end = date.today()
+    df = load_transactions(BRAVES_ID, end - timedelta(days=60), end)
+    if df.empty:
+        return df
+    mask = ~df["Type"].str.contains("|".join(NOISE_WORDS), case=False, na=False)
+    return df[mask].head(n)
+
+
+def moves_html(df):
+    rows = ""
+    for _, r in df.iterrows():
+        rows += (
+            '<div class="move-row"><span class="date">' + short_date(r["Date"]) + "</span>"
+            "<span>" + html.escape(str(r["Description"])) + "</span></div>"
+        )
+    return rows
+
+
+def links_html():
+    items = ""
+    for link in NEWS_LINKS:
+        items += (
+            '<a class="link-card" href="' + html.escape(link["url"]) +
+            '" target="_blank" rel="noopener noreferrer">'
+            '<span class="ln">' + html.escape(link["name"]) + "</span>"
+            '<span class="lnote">' + html.escape(link.get("note", "")) + "</span></a>"
+        )
+    return '<div class="link-grid">' + items + "</div>"
 
 # ---------- Arrow buttons for the standings ----------
 if "stand_view" not in st.session_state:
@@ -320,6 +369,27 @@ with right:
         st.caption("Last 10 games, oldest to newest")
         st.markdown(form_html(finals.tail(10)), unsafe_allow_html=True)
         st.markdown(results_html(finals), unsafe_allow_html=True)
+
+# ----- Latest moves and reading list -----
+moves_col, links_col = st.columns(2, gap="large")
+
+with moves_col:
+    st.subheader("Latest Moves")
+    try:
+        moves = latest_moves()
+    except Exception:
+        moves = None
+    if moves is None:
+        st.info("Couldn't load moves right now.")
+    elif moves.empty:
+        st.info("No recent moves.")
+    else:
+        st.markdown(moves_html(moves), unsafe_allow_html=True)
+        st.caption("Full list under Recent Moves on the Braves Roster page.")
+
+with links_col:
+    st.subheader("Reading List")
+    st.markdown(links_html(), unsafe_allow_html=True)
 
 # ----- Team leaders -----
 st.subheader("Team Leaders")

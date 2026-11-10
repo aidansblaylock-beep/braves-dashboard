@@ -42,9 +42,31 @@ def load_transactions(team_id, start, end):
     return df.sort_values("Date", ascending=False).reset_index(drop=True)
 
 
-st.header("Offseason")
+@st.cache_data(ttl=900, show_spinner=False)
+def load_40man(team_id, on_date):
+    """The team's 40-man roster on a given date, as {player id: name and position}."""
+    resp = requests.get(
+        f"{BASE_URL}/teams/{team_id}/roster",
+        params={"rosterType": "40Man", "date": on_date.strftime("%Y-%m-%d")},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return {
+        e["person"]["id"]: {
+            "name": e["person"]["fullName"],
+            "pos": e.get("position", {}).get("abbreviation", ""),
+        }
+        for e in resp.json()["roster"]
+    }
+
+
+# ---------- Header ----------
+head_col, link_col = st.columns([4, 1], vertical_alignment="center")
+head_col.header("Offseason")
+link_col.link_button("MLB Trade Rumors ↗", "https://www.mlbtraderumors.com", use_container_width=True)
 st.caption("Official MLB transactions: signings, trades, waiver claims and roster moves.")
 
+# ---------- Controls ----------
 today = date.today()
 teams = load_teams(today.year)
 team_names = ["All MLB"] + list(teams)
@@ -63,6 +85,42 @@ if team_choice == "All MLB" and (end - start).days > 14:
     st.info("League-wide results are large, so only the most recent 14 days are shown.")
     start = end - timedelta(days=14)
 
+# ---------- Roster snapshot (one team at a time) ----------
+if team_choice != "All MLB":
+    team_id = teams[team_choice]
+    try:
+        before = load_40man(team_id, start)
+        after = load_40man(team_id, end)
+    except Exception:
+        before = after = None
+
+    if after is not None:
+        added = [after[i] for i in after if i not in before]
+        removed = [before[i] for i in before if i not in after]
+
+        s = st.columns(3)
+        s[0].metric("40-Man Roster", len(after), delta=len(after) - len(before), delta_color="off")
+        s[1].metric("Added to 40-man", len(added))
+        s[2].metric("Removed from 40-man", len(removed))
+
+        with st.expander(f"Roster changes, {start:%b} {start.day} to {end:%b} {end.day}"):
+            left, right = st.columns(2)
+            left.markdown("**Added**")
+            if added:
+                for p in added:
+                    left.write(f"{p['name']} ({p['pos']})")
+            else:
+                left.write("No additions in this range.")
+            right.markdown("**Removed**")
+            if removed:
+                for p in removed:
+                    right.write(f"{p['name']} ({p['pos']})")
+            else:
+                right.write("No removals in this range.")
+            st.caption("The 40-man count includes players on the injured list "
+                       "and players listed as reassigned to the minors.")
+
+# ---------- Transactions feed ----------
 try:
     df = load_transactions(None if team_choice == "All MLB" else teams[team_choice], start, end)
 except Exception:

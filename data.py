@@ -274,3 +274,61 @@ def editing_enabled():
         return not bool(st.secrets.get("PUBLIC_MODE", False))
     except Exception:
         return True
+
+TX_COLUMNS = ["Photo", "Date", "Player", "Type", "Team", "Description"]
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_transactions(team_id, start, end):
+    """Official MLB transactions for one team between two dates, newest first."""
+    params = {
+        "teamId": team_id,
+        "startDate": start.strftime("%m/%d/%Y"),
+        "endDate": end.strftime("%m/%d/%Y"),
+    }
+    resp = requests.get(f"{BASE_URL}/transactions", params=params, timeout=30)
+    resp.raise_for_status()
+
+    rows = []
+    for t in resp.json().get("transactions", []):
+        person = t.get("person") or {}
+        team = t.get("toTeam") or t.get("fromTeam") or {}
+        rows.append({
+            "Photo": headshot_url(person["id"]) if person.get("id") else "",
+            "Date": str(t.get("date", ""))[:10],
+            "Player": person.get("fullName", ""),
+            "Type": t.get("typeDesc", ""),
+            "Team": team.get("name", ""),
+            "Description": t.get("description", ""),
+        })
+    df = pd.DataFrame(rows, columns=TX_COLUMNS)
+    return df.sort_values("Date", ascending=False).reset_index(drop=True)
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_40man(team_id, on_date):
+    """A team's 40-man roster on a given date, as {player id: name and position}."""
+    resp = requests.get(
+        f"{BASE_URL}/teams/{team_id}/roster",
+        params={"rosterType": "40Man", "date": on_date.strftime("%Y-%m-%d")},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return {
+        e["person"]["id"]: {
+            "name": e["person"]["fullName"],
+            "pos": e.get("position", {}).get("abbreviation", ""),
+        }
+        for e in resp.json()["roster"]
+    }
+
+
+# Hand-picked links for the Home page reading list. Edit this list yourself.
+NEWS_LINKS = [
+    {"name": "MLB Trade Rumors", "note": "Transactions and rumors", "url": "https://www.mlbtraderumors.com"},
+    {"name": "MLB.com: Braves", "note": "Team news and schedule", "url": "https://www.mlb.com/braves"},
+    {"name": "Braves Pipeline", "note": "Minor league and prospect coverage", "url": "https://www.mlb.com/braves/news/topic/braves-pipeline-coverage"},
+    {"name": "MLB.com News", "note": "League-wide news and articles", "url": "https://www.mlb.com/news"},
+    # Add your own, for example a beat writer you follow:
+    # {"name": "Writer Name", "note": "Braves beat writer, Outlet", "url": "https://..."},
+]
