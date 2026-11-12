@@ -136,3 +136,7 @@ pages = [
 
 pg = st.navigation(pages, position="top")
 pg.run()
+
+st.divider()
+st.caption("Unofficial fan project, not affiliated with or endorsed by Major League Baseball "
+           "or the Atlanta Braves. Data from the MLB Stats API.")

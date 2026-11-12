@@ -6,7 +6,14 @@ from pathlib import Path
 
 BASE_URL = "https://statsapi.mlb.com/api/v1"
 BRAVES_ID = 144
-SHOW_MLB_IMAGES = True      # set to False to hide all MLB logos and headshots
+def _safe_mode_on():
+    try:
+        return bool(st.secrets.get("PUBLIC_SAFE_MODE", False))
+    except Exception:
+        return False
+
+
+SHOW_MLB_IMAGES = not _safe_mode_on()
 
 _PLACEHOLDER = (
     "data:image/svg+xml;utf8,"
@@ -268,10 +275,11 @@ def load_team_snapshot(season):
     return snap
 
 def editing_enabled():
-    """Editing the favorites list is on locally. Setting PUBLIC_MODE = true in the
-    deployed app's Secrets turns it off for visitors."""
+    """Editing is on locally. Either PUBLIC_MODE or PUBLIC_SAFE_MODE in the deployed
+    app's Secrets turns it off for visitors."""
     try:
-        return not bool(st.secrets.get("PUBLIC_MODE", False))
+        return not (bool(st.secrets.get("PUBLIC_MODE", False))
+                    or bool(st.secrets.get("PUBLIC_SAFE_MODE", False)))
     except Exception:
         return True
 
