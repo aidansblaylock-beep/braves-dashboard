@@ -140,3 +140,9 @@ pg.run()
 st.divider()
 st.caption("Unofficial fan project, not affiliated with or endorsed by Major League Baseball "
            "or the Atlanta Braves. Data from the MLB Stats API.")
+
+try:
+    _val = st.secrets.get("PUBLIC_SAFE_MODE", "not found")
+    st.caption(f"Secret value: {_val!r} ({type(_val).__name__}). Names seen: {list(st.secrets.keys())}")
+except Exception as e:
+    st.caption(f"Could not read secrets: {e}")
