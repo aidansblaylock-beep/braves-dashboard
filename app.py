@@ -1,8 +1,18 @@
 import streamlit as st
 from datetime import date
-from data import load_team_snapshot, SHOW_MLB_IMAGES
+from data import load_team_snapshot, safe_mode_on
 
 st.set_page_config(page_title="Braves-Dashboard", layout="wide")
+
+@st.cache_resource
+def _mode_tracker():
+    return {"safe": None}
+
+
+_tracker = _mode_tracker()
+if _tracker["safe"] != safe_mode_on():
+    st.cache_data.clear()
+    _tracker["safe"] = safe_mode_on()
 
 # Logo images (swap these two URLs if you'd rather use your own files)
 BRAVES_LOGO = "https://www.mlbstatic.com/team-logos/team-cap-on-dark/144.svg"
@@ -104,8 +114,9 @@ strip_html = "".join(
     for label, value in stats
 ) or '<div class="stat"><span class="value">ATLANTA BRAVES</span></div>'
 
-braves_mark = f'<img src="{BRAVES_LOGO}" alt="ATL">' if SHOW_MLB_IMAGES else "ATL"
-mlb_mark = f'<img src="{MLB_LOGO}" alt="MLB">' if SHOW_MLB_IMAGES else "MLB"
+show_images = not safe_mode_on()
+braves_mark = f'<img src="{BRAVES_LOGO}" alt="ATL">' if show_images else "ATL"
+mlb_mark = f'<img src="{MLB_LOGO}" alt="MLB">' if show_images else "MLB"
 
 # ---------- Site header (logos are buttons) ----------
 st.markdown(f"""
@@ -140,9 +151,3 @@ pg.run()
 st.divider()
 st.caption("Unofficial fan project, not affiliated with or endorsed by Major League Baseball "
            "or the Atlanta Braves. Data from the MLB Stats API.")
-
-try:
-    _val = st.secrets.get("PUBLIC_SAFE_MODE", "not found")
-    st.caption(f"Secret value: {_val!r} ({type(_val).__name__}). Names seen: {list(st.secrets.keys())}")
-except Exception as e:
-    st.caption(f"Could not read secrets: {e}")

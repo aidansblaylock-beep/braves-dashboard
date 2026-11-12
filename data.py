@@ -6,14 +6,19 @@ from pathlib import Path
 
 BASE_URL = "https://statsapi.mlb.com/api/v1"
 BRAVES_ID = 144
-def _safe_mode_on():
+def _flag(name):
     try:
-        return bool(st.secrets.get("PUBLIC_SAFE_MODE", False))
+        value = st.secrets.get(name, False)
     except Exception:
         return False
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "1", "yes", "on")
+    return bool(value)
 
 
-SHOW_MLB_IMAGES = not _safe_mode_on()
+def safe_mode_on():
+    return _flag("PUBLIC_SAFE_MODE")
+
 
 _PLACEHOLDER = (
     "data:image/svg+xml;utf8,"
@@ -23,8 +28,9 @@ _PLACEHOLDER = (
     "<ellipse cx='60' cy='112' rx='38' ry='34' fill='%23b8c3d3'/></svg>"
 )
 
+
 def headshot_url(player_id, width=120):
-    if not SHOW_MLB_IMAGES:
+    if safe_mode_on():
         return _PLACEHOLDER
     return (
         "https://img.mlbstatic.com/mlb-photos/image/upload/"
