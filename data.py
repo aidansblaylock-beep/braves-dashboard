@@ -3,6 +3,8 @@ import pandas as pd
 import streamlit as st
 import json
 from pathlib import Path
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 BASE_URL = "https://statsapi.mlb.com/api/v1"
 BRAVES_ID = 144
@@ -346,3 +348,58 @@ NEWS_LINKS = [
     # Add your own, for example a beat writer you follow:
     # {"name": "Writer Name", "note": "Braves beat writer, Outlet", "url": "https://..."},
 ]
+# ---------- Today's game ----------
+EASTERN = ZoneInfo("America/New_York")
+
+
+def today_eastern():
+    """Today's date in Eastern time. The deployed server runs on UTC, so plain
+    date.today() would flip to 'tomorrow' around 8 PM Eastern, mid-game."""
+    return datetime.now(EASTERN).date()
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def load_todays_games(on_date):
+    """Braves games on one date (a list, because doubleheaders mean two).
+    An empty list means no game that day. Cached for only 60 seconds so a
+    live score stays fresh."""
+    resp = requests.get(
+        f"{BASE_URL}/schedule",
+        params={
+            "sportId": 1,
+            "teamId": BRAVES_ID,
+            "date": on_date.strftime("%Y-%m-%d"),
+            "hydrate": "team,probablePitcher,linescore",
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+
+    games = []
+    for d in resp.json().get("dates", []):
+        for g in d["games"]:
+            home, away = g["teams"]["home"], g["teams"]["away"]
+            is_home = home["team"]["id"] == BRAVES_ID
+            us, them = (home, away) if is_home else (away, home)
+
+            # The API gives start time in UTC; convert it to Eastern
+            start = datetime.fromisoformat(g["gameDate"].replace("Z", "+00:00")).astimezone(EASTERN)
+            line = g.get("linescore", {})
+
+            games.append({
+                "start": start,
+                "start_text": f"{start:%I:%M %p}".lstrip("0") + " ET",
+                "state": g["status"]["abstractGameState"],   # Preview, Live or Final
+                "detail": g["status"]["detailedState"],      # Scheduled, Postponed, etc.
+                "is_home": is_home,
+                "us_abbr": us["team"].get("abbreviation", "ATL"),
+                "us_score": us.get("score"),
+                "us_pitcher": us.get("probablePitcher", {}).get("fullName"),
+                "them_id": them["team"]["id"],
+                "them_name": them["team"]["name"],
+                "them_abbr": them["team"].get("abbreviation", ""),
+                "them_score": them.get("score"),
+                "them_pitcher": them.get("probablePitcher", {}).get("fullName"),
+                "inning": f"{line.get('inningState', '')} {line.get('currentInningOrdinal', '')}".strip(),
+            })
+    return sorted(games, key=lambda x: x["start"])

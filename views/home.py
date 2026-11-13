@@ -3,7 +3,10 @@ import requests
 import pandas as pd
 import streamlit as st
 from datetime import date, datetime, timedelta
-from data import load_roster, load_transactions, NEWS_LINKS
+from data import (
+    load_roster, load_transactions, load_todays_games,
+    load_team_snapshot, today_eastern, NEWS_LINKS,
+)
 
 BASE_URL = "https://statsapi.mlb.com/api/v1"
 BRAVES_ID = 144
@@ -99,6 +102,27 @@ STYLE = """
 .link-card:hover { border-left-color: #d6001c; transform: translateY(-1px); }
 .link-card .ln { font-weight: 800; color: #0b1f3a; font-size: 0.95rem; }
 .link-card .lnote { color: #5b6b82; font-size: 0.8rem; }
+
+/* Today's game card */
+.tg-card {
+    background: #ffffff; border: 1px solid #e3e8ef; border-left: 4px solid #d6001c;
+    border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;
+    box-shadow: 0 1px 2px rgba(11, 31, 58, 0.06);
+}
+.tg-top { display: flex; justify-content: space-between; align-items: center; }
+.tg-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; color: #5b6b82; text-transform: uppercase; }
+.tg-status { font-size: 0.8rem; font-weight: 800; color: #0b1f3a; }
+.tg-status.live { color: #d6001c; }
+.tg-status.w { color: #2e9e5b; }
+.tg-status.l { color: #d6001c; }
+.tg-matchup { font-size: 1.3rem; font-weight: 800; color: #0b1f3a; margin: 4px 0 6px; }
+.tg-sub { font-size: 0.9rem; color: #44556d; }
+.tg-score { display: flex; gap: 14px; font-size: 1.6rem; font-weight: 800; color: #0b1f3a; font-variant-numeric: tabular-nums; }
+.tg-pitchers { margin-top: 8px; padding-top: 8px; border-top: 1px solid #eef1f5; }
+.tg-plabel { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; color: #5b6b82; text-transform: uppercase; margin-bottom: 4px; }
+.tg-prow { display: flex; gap: 10px; font-size: 0.9rem; color: #44556d; padding: 2px 0; }
+.tg-prow span { width: 40px; color: #5b6b82; font-weight: 700; }
+.tg-prow b { color: #0b1f3a; }
 </style>
 """
 
@@ -300,6 +324,61 @@ def links_html():
         )
     return '<div class="link-grid">' + items + "</div>"
 
+def game_card_html(g):
+    """One game as a card. g is one dict from load_todays_games()."""
+    where = "vs" if g["is_home"] else "@"
+    us = html.escape(g["us_abbr"])
+    them = html.escape(g["them_abbr"] or g["them_name"])
+    matchup = "Braves " + where + " " + html.escape(g["them_name"])
+    has_score = g["us_score"] is not None and g["them_score"] is not None
+    pitchers = ""
+
+    if g["state"] == "Live" and has_score:
+        status = "LIVE" + (" · " + g["inning"] if g["inning"] else "")
+        status_cls = "live"
+    elif g["state"] == "Final" and has_score:
+        won = g["us_score"] > g["them_score"]
+        status = "FINAL · " + ("W" if won else "L")
+        status_cls = "w" if won else "l"
+    else:
+        # Not started yet (or postponed, delayed, etc.): show start time + probable pitchers
+        status = g["start_text"]
+        if g["detail"] not in ("Scheduled", "Pre-Game"):
+            status += " · " + g["detail"]
+        status_cls = ""
+        us_p = html.escape(g["us_pitcher"] or "TBD")
+        them_p = html.escape(g["them_pitcher"] or "TBD")
+        pitchers = (
+            '<div class="tg-pitchers"><div class="tg-plabel">Probable pitchers</div>'
+            '<div class="tg-prow"><span>' + us + "</span><b>" + us_p + "</b></div>"
+            '<div class="tg-prow"><span>' + them + "</span><b>" + them_p + "</b></div></div>"
+        )
+
+    score = ""
+    if has_score:
+        score = (
+            '<div class="tg-score"><span>' + us + " " + str(g["us_score"]) + "</span>"
+            "<span>–</span><span>" + them + " " + str(g["them_score"]) + "</span></div>"
+        )
+
+    return (
+        '<div class="tg-card"><div class="tg-top">'
+        '<span class="tg-label">Today&rsquo;s Game</span>'
+        '<span class="tg-status ' + status_cls + '">' + html.escape(status) + "</span></div>"
+        '<div class="tg-matchup">' + matchup + "</div>" + score + pitchers + "</div>"
+    )
+
+
+def off_day_html(next_game):
+    extra = ""
+    if next_game:
+        extra = '<div class="tg-sub">Next game: ' + html.escape(next_game) + "</div>"
+    return (
+        '<div class="tg-card"><div class="tg-top">'
+        '<span class="tg-label">Today&rsquo;s Game</span></div>'
+        '<div class="tg-matchup">No game today</div>' + extra + "</div>"
+    )
+
 # ---------- Arrow buttons for the standings ----------
 if "stand_view" not in st.session_state:
     st.session_state["stand_view"] = 0
@@ -334,6 +413,21 @@ if not braves.empty:
     m[4].metric("Last 10", b["L10"])
 
 st.write("")
+
+# ----- Today's game -----
+try:
+    todays_games = load_todays_games(today_eastern())
+except Exception:
+    todays_games = None
+
+if todays_games is None:
+    st.info("Couldn't load today's game right now.")
+elif not todays_games:
+    next_game = load_team_snapshot(default_season)["next"]
+    st.markdown(off_day_html(next_game), unsafe_allow_html=True)
+else:
+    for g in todays_games:
+        st.markdown(game_card_html(g), unsafe_allow_html=True)
 
 # ----- Standings and recent results -----
 left, right = st.columns([3, 2], gap="large")
