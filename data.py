@@ -401,5 +401,7 @@ def load_todays_games(on_date):
                 "them_score": them.get("score"),
                 "them_pitcher": them.get("probablePitcher", {}).get("fullName"),
                 "inning": f"{line.get('inningState', '')} {line.get('currentInningOrdinal', '')}".strip(),
+                                "double_header": g.get("doubleHeader", "N"),   # "N" = single game, "Y"/"S" = doubleheader
+                "game_number": g.get("gameNumber", 1),          # 1 or 2 on a doubleheader day
             })
     return sorted(games, key=lambda x: x["start"])

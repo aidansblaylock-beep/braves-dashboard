@@ -5,7 +5,7 @@ import streamlit as st
 from datetime import date, datetime, timedelta
 from data import (
     load_roster, load_transactions, load_todays_games,
-    load_team_snapshot, today_eastern, NEWS_LINKS,
+    load_team_snapshot, today_eastern, EASTERN, NEWS_LINKS,
 )
 
 BASE_URL = "https://statsapi.mlb.com/api/v1"
@@ -326,6 +326,9 @@ def links_html():
 
 def game_card_html(g):
     """One game as a card. g is one dict from load_todays_games()."""
+    label = "Today&rsquo;s Game"
+    if g.get("double_header", "N") in ("Y", "S"):
+        label += " &middot; Game " + str(g.get("game_number", 1))
     where = "vs" if g["is_home"] else "@"
     us = html.escape(g["us_abbr"])
     them = html.escape(g["them_abbr"] or g["them_name"])
@@ -335,6 +338,8 @@ def game_card_html(g):
 
     if g["state"] == "Live" and has_score:
         status = "LIVE" + (" · " + g["inning"] if g["inning"] else "")
+        if g["detail"].startswith(("Delayed", "Suspended")):
+            status = g["detail"] + (" · " + g["inning"] if g["inning"] else "")
         status_cls = "live"
     elif g["state"] == "Final" and has_score:
         won = g["us_score"] > g["them_score"]
@@ -363,7 +368,7 @@ def game_card_html(g):
 
     return (
         '<div class="tg-card"><div class="tg-top">'
-        '<span class="tg-label">Today&rsquo;s Game</span>'
+        '<span class="tg-label">' + label + "</span>"
         '<span class="tg-status ' + status_cls + '">' + html.escape(status) + "</span></div>"
         '<div class="tg-matchup">' + matchup + "</div>" + score + pitchers + "</div>"
     )
@@ -415,19 +420,39 @@ if not braves.empty:
 st.write("")
 
 # ----- Today's game -----
-try:
-    todays_games = load_todays_games(today_eastern())
-except Exception:
-    todays_games = None
 
-if todays_games is None:
-    st.info("Couldn't load today's game right now.")
-elif not todays_games:
-    next_game = load_team_snapshot(default_season)["next"]
-    st.markdown(off_day_html(next_game), unsafe_allow_html=True)
-else:
-    for g in todays_games:
+def render_todays_game():
+    try:
+        games = load_todays_games(today_eastern())
+    except Exception:
+        games = None
+
+    if games is None:
+        st.info("Couldn't load today's game right now.")
+        return
+    if not games:
+        next_game = load_team_snapshot(default_season)["next"]
+        st.markdown(off_day_html(next_game), unsafe_allow_html=True)
+        return
+
+    for g in games:
         st.markdown(game_card_html(g), unsafe_allow_html=True)
+
+    # Small "last updated" note, only while the game is upcoming or live
+    if any(g["state"] != "Final" for g in games):
+        stamp = f"{datetime.now(EASTERN):%I:%M:%S %p}".lstrip("0")
+        st.caption(f"Updated {stamp} ET")
+
+
+# Refresh every 60 seconds while a game is upcoming or live (or if the last
+# load failed, so it retries). Off days and finished games don't refresh.
+try:
+    _check = load_todays_games(today_eastern())
+except Exception:
+    _check = None
+needs_refresh = _check is None or any(g["state"] != "Final" for g in _check)
+
+st.fragment(run_every=60 if needs_refresh else None)(render_todays_game)()
 
 # ----- Standings and recent results -----
 left, right = st.columns([3, 2], gap="large")
