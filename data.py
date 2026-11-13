@@ -403,5 +403,11 @@ def load_todays_games(on_date):
                 "inning": f"{line.get('inningState', '')} {line.get('currentInningOrdinal', '')}".strip(),
                                 "double_header": g.get("doubleHeader", "N"),   # "N" = single game, "Y"/"S" = doubleheader
                 "game_number": g.get("gameNumber", 1),          # 1 or 2 on a doubleheader day
+                                "double_header": g.get("doubleHeader", "N"),   # "N" = single game, "Y"/"S" = doubleheader
+                "game_number": g.get("gameNumber", 1),          # 1 or 2 on a doubleheader day
+                "game_type": g.get("gameType", "R"),            # R regular, S spring, F/D/L/W postseason
+                "series": g.get("seriesDescription", ""),       # e.g. "NL Division Series"
+                "series_game": g.get("seriesGameNumber"),       # e.g. 4
+                "series_length": g.get("gamesInSeries"),        # e.g. 5 (best of 5)
             })
     return sorted(games, key=lambda x: x["start"])

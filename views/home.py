@@ -324,11 +324,30 @@ def links_html():
         )
     return '<div class="link-grid">' + items + "</div>"
 
-def game_card_html(g):
-    """One game as a card. g is one dict from load_todays_games()."""
-    label = "Today&rsquo;s Game"
+POSTSEASON_TYPES = ("F", "D", "L", "W")
+
+
+def game_label(g):
+    """Small heading above the matchup: the playoff series and game number,
+    'Spring Training', or plain 'Today's Game'."""
+    gtype = g.get("game_type", "R")
+
+    if gtype in POSTSEASON_TYPES and g.get("series"):
+        label = html.escape(g["series"])
+        if g.get("series_game"):
+            label += " &middot; Game " + str(g["series_game"])
+        if g.get("series_length"):
+            label += " &middot; Best of " + str(g["series_length"])
+        return label
+
+    label = "Spring Training" if gtype == "S" else "Today&rsquo;s Game"
     if g.get("double_header", "N") in ("Y", "S"):
         label += " &middot; Game " + str(g.get("game_number", 1))
+    return label
+
+def game_card_html(g):
+    """One game as a card. g is one dict from load_todays_games()."""
+    label = game_label(g)
     where = "vs" if g["is_home"] else "@"
     us = html.escape(g["us_abbr"])
     them = html.escape(g["them_abbr"] or g["them_name"])
