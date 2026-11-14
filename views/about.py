@@ -72,8 +72,3 @@ st.markdown(card(
     '<p>The full code is public on <a href="' + html.escape(GITHUB_URL) +
     '" target="_blank" rel="noopener noreferrer">GitHub</a>.</p>',
 ), unsafe_allow_html=True)
-
-st.caption(
-    "Unofficial fan project, not affiliated with or endorsed by Major League Baseball "
-    "or the Atlanta Braves."
-)
