@@ -124,11 +124,9 @@ st.markdown(f"""
     <div class="strip">{strip_html}</div>
     <div class="logos">
         <a href="/roster" target="_self" title="Braves roster and stats">
-            <a href="/roster" target="_self" title="Braves roster and stats">
             {braves_mark}
         </a>
         <a href="/watch" target="_self" title="My players to watch">
-            <a href="/watch" target="_self" title="My players to watch">
             {mlb_mark}
         </a>
     </div>
@@ -142,6 +140,7 @@ pages = [
     st.Page("views/watch.py", title="Players to Watch", icon=":material/star:", url_path="watch"),
     st.Page("views/field_view.py", title="Field View", icon=":material/sports_baseball:", url_path="field-view"),
     st.Page("views/prospects.py", title="Prospects", icon=":material/trending_up:", url_path="prospects"),
+    st.Page("views/about.py", title="About", icon=":material/info:", url_path="about"),
        # st.Page("views/offseason.py", title="Offseason", icon=":material/swap_horiz:", url_path="offseason"),
 ]
 
