@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import date
 from data import load_team_snapshot, safe_mode_on
+from player_dialog import show_player_popup_if_requested
 
 st.set_page_config(page_title="Braves-Dashboard", layout="wide")
 
@@ -146,6 +147,7 @@ pages = [
 
 pg = st.navigation(pages, position="top")
 pg.run()
+show_player_popup_if_requested()
 
 st.divider()
 st.caption("Unofficial fan project, not affiliated with or endorsed by Major League Baseball "

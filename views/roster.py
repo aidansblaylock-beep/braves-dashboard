@@ -1,8 +1,70 @@
+import html
+import pandas as pd
 import streamlit as st
 from datetime import date, timedelta
 from data import load_roster, load_transactions, load_40man, BRAVES_ID
 
+STYLE = """
+<style>
+.rt-wrap { overflow-x: auto; }
+.rt-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.rt-table th {
+    text-align: right; font-size: 0.68rem; letter-spacing: 0.07em; text-transform: uppercase;
+    color: #5b6b82; border-bottom: 2px solid #0b1f3a; padding: 8px 10px; white-space: nowrap;
+}
+.rt-table td {
+    text-align: right; padding: 6px 10px; border-bottom: 1px solid #eef1f5; color: #0b1f3a;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.rt-table th:nth-child(-n+5), .rt-table td:nth-child(-n+5) { text-align: left; }
+.rt-table tbody tr:hover td { background: #f6f8fb; }
+.rt-photo {
+    width: 32px; height: 32px; border-radius: 50%; object-fit: cover; object-position: top;
+    background: #e3e8ef; display: block;
+}
+.rt-name a { color: #0b1f3a; font-weight: 700; text-decoration: none; }
+.rt-name a:hover { color: #d6001c; text-decoration: underline; }
+</style>
+"""
+
+HIT_STATS = ["G", "AB", "H", "HR", "RBI", "BB", "SO", "AVG", "OBP", "SLG", "OPS"]
+HIT_DIGITS = {"AVG": 3, "OBP": 3, "SLG": 3, "OPS": 3}   # stats shown with decimals
+PIT_STATS = ["G", "GS", "W", "L", "SV", "IP", "ERA", "WHIP", "SO", "BB", "K/9"]
+PIT_DIGITS = {"IP": 1, "ERA": 2, "WHIP": 2, "K/9": 2}   # IP needs 1 decimal (152.1 = 152 and 1/3 innings)
+
+
+def fmt_cell(col, value, rate_digits):
+    """One stat cell: '-' if missing, whole numbers for counts, decimals for rates."""
+    if pd.isna(value):
+        return "-"
+    if col in rate_digits:
+        text = f"{value:.{rate_digits[col]}f}"
+        return text.lstrip("0") if rate_digits[col] == 3 else text   # 0.283 -> .283
+    return f"{value:.0f}"
+
+
+def roster_table_html(df, stat_cols, rate_digits):
+    """The roster as an HTML table where each player's name links to their profile popup."""
+    head = ("<th></th><th>Player</th><th>#</th><th>Pos</th><th>Status</th>"
+            + "".join("<th>" + c + "</th>" for c in stat_cols))
+    body = ""
+    for _, r in df.iterrows():
+        body += (
+            "<tr>"
+            '<td><img class="rt-photo" src="' + r["Photo"] + '" alt=""></td>'
+            '<td class="rt-name"><a href="?player=' + str(int(r["ID"])) + '" target="_self">'
+            + html.escape(str(r["Player"])) + "</a></td>"
+            "<td>" + html.escape(str(r["#"])) + "</td>"
+            "<td>" + html.escape(str(r["Pos"])) + "</td>"
+            "<td>" + html.escape(str(r["Status"])) + "</td>"
+            + "".join("<td>" + fmt_cell(c, r[c], rate_digits) + "</td>" for c in stat_cols)
+            + "</tr>"
+        )
+    return ('<div class="rt-wrap"><table class="rt-table"><thead><tr>' + head +
+            "</tr></thead><tbody>" + body + "</tbody></table></div>")
+
 st.header("Braves Roster")
+st.markdown(STYLE, unsafe_allow_html=True)
 
 today = date.today()
 default_season = today.year if today.month >= 3 else today.year - 1
@@ -28,33 +90,25 @@ with hit_tab:
     if hitters.empty:
         st.info("No hitters match these filters.")
     else:
-        st.dataframe(
-            hitters.sort_values("AB", ascending=False, na_position="last"),
-            hide_index=True,
-            use_container_width=True,
-            row_height=44,
-            column_config={
-                "Photo": PHOTO,
-                **{c: st.column_config.NumberColumn(c, format="%.3f")
-                   for c in ["AVG", "OBP", "SLG", "OPS"]},
-            },
+        s1, s2, _ = st.columns([1, 1, 2])
+        sort_col = s1.selectbox("Sort by", HIT_STATS, index=HIT_STATS.index("AB"), key="hit_sort")
+        order = s2.radio("Order", ["High to low", "Low to high"], horizontal=True, key="hit_order")
+        ordered = hitters.sort_values(
+            sort_col, ascending=(order == "Low to high"), na_position="last"
         )
+        st.markdown(roster_table_html(ordered, HIT_STATS, HIT_DIGITS), unsafe_allow_html=True)
 
 with pit_tab:
     if pitchers.empty:
         st.info("No pitchers match these filters.")
     else:
-        st.dataframe(
-            pitchers.sort_values("IP", ascending=False, na_position="last"),
-            hide_index=True,
-            use_container_width=True,
-            row_height=44,
-            column_config={
-                "Photo": PHOTO,
-                **{c: st.column_config.NumberColumn(c, format="%.2f")
-                   for c in ["ERA", "WHIP", "K/9"]},
-            },
+        s1, s2, _ = st.columns([1, 1, 2])
+        sort_col = s1.selectbox("Sort by", PIT_STATS, index=PIT_STATS.index("IP"), key="pit_sort")
+        order = s2.radio("Order", ["High to low", "Low to high"], horizontal=True, key="pit_order")
+        ordered = pitchers.sort_values(
+            sort_col, ascending=(order == "Low to high"), na_position="last"
         )
+        st.markdown(roster_table_html(ordered, PIT_STATS, PIT_DIGITS), unsafe_allow_html=True)
 
 with moves_tab:
     st.caption("Roster changes and official transactions for the Braves. "

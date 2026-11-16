@@ -84,6 +84,7 @@ def load_roster(season, roster_type):
             "#": entry.get("jerseyNumber", ""),
             "Pos": entry["position"]["abbreviation"],
             "Status": categorize(entry["status"]["description"]),
+            "ID": person["id"],
         }
 
         stats = {}
@@ -103,8 +104,8 @@ def load_roster(season, roster_type):
                 row[label] = stats.get("hitting", {}).get(key)
             hitters.append(row)
 
-    hit_df = pd.DataFrame(hitters, columns=INFO_COLS + list(HIT_COLS.values()))
-    pit_df = pd.DataFrame(pitchers, columns=INFO_COLS + list(PIT_COLS.values()))
+    hit_df = pd.DataFrame(hitters, columns=INFO_COLS + ["ID"] + list(HIT_COLS.values()))
+    pit_df = pd.DataFrame(pitchers, columns=INFO_COLS + ["ID"] + list(PIT_COLS.values()))
 
     for df in (hit_df, pit_df):
         for col in df.columns:
@@ -411,3 +412,70 @@ def load_todays_games(on_date):
                 "series_length": g.get("gamesInSeries"),        # e.g. 5 (best of 5)
             })
     return sorted(games, key=lambda x: x["start"])
+
+# ---------- Player profile ----------
+@st.cache_data(ttl=3600, show_spinner=False)
+def load_player_profile(player_id):
+    """Bio plus year-by-year and career stats for one player.
+    Returns None if the player ID isn't found."""
+    resp = requests.get(
+        f"{BASE_URL}/people/{int(player_id)}",
+        params={
+            "hydrate": "currentTeam,stats(group=[hitting,pitching],"
+                       "type=[yearByYear,career],sportId=1)"
+        },
+        timeout=20,
+    )
+    if resp.status_code in (400, 404):
+        return None
+    resp.raise_for_status()
+    people = resp.json().get("people", [])
+    if not people:
+        return None
+    p = people[0]
+
+    place_parts = (p.get("birthCity"), p.get("birthStateProvince"), p.get("birthCountry"))
+    bio = {
+        "id": p["id"],
+        "name": p.get("fullName", ""),
+        "nickname": p.get("nickName", ""),
+        "number": p.get("primaryNumber", ""),
+        "pos": p.get("primaryPosition", {}).get("abbreviation", ""),
+        "pos_name": p.get("primaryPosition", {}).get("name", ""),
+        "team": p.get("currentTeam", {}).get("name", ""),
+        "team_id": p.get("currentTeam", {}).get("id"),
+        "age": p.get("currentAge"),
+        "birth_date": p.get("birthDate", ""),
+        "birth_place": ", ".join(x for x in place_parts if x),
+        "height": p.get("height", ""),
+        "weight": p.get("weight"),
+        "bats": p.get("batSide", {}).get("code", ""),
+        "throws": p.get("pitchHand", {}).get("code", ""),
+        "debut": p.get("mlbDebutDate", ""),
+        "active": p.get("active", False),
+    }
+
+    # One entry per group; a group with no stats just stays empty
+    stats = {
+        "hitting": {"seasons": [], "career": None},
+        "pitching": {"seasons": [], "career": None},
+    }
+    for block in p.get("stats", []):
+        group = block["group"]["displayName"]       # "hitting" or "pitching"
+        kind = block["type"]["displayName"]         # "yearByYear" or "career"
+        splits = block.get("splits", [])
+        if group not in stats or not splits:
+            continue
+        if kind == "yearByYear":
+            stats[group]["seasons"] = [
+                {
+                    "season": s.get("season"),
+                    "team": s.get("team", {}).get("name", ""),
+                    "stat": s.get("stat", {}),
+                }
+                for s in splits
+            ]
+        elif kind == "career":
+            stats[group]["career"] = splits[0].get("stat")
+
+    return {"bio": bio, "stats": stats}
